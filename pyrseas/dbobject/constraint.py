@@ -136,7 +136,8 @@ class CheckConstraint(Constraint):
                    CASE WHEN contypid = 0 THEN conrelid::regclass::text
                         ELSE contypid::regtype::text END AS table,
                    contypid != 0 AS is_domain_check, conkey AS columns,
-                   consrc AS expression, coninhcount > 0 AS inherited, c.oid,
+                   pg_get_expr(conbin, conrelid) AS expression,
+                   coninhcount > 0 AS inherited, c.oid,
                    obj_description(c.oid, 'pg_constraint') AS description
             FROM pg_constraint c
                  JOIN pg_namespace ON (connamespace = pg_namespace.oid)
@@ -181,7 +182,7 @@ class CheckConstraint(Constraint):
         dct.pop('is_domain_check')
         if not self.inherited:
             dct.pop('inherited')
-        if dbcols is not None:
+        if dbcols is not None and self.columns is not None:
             dct['columns'] = [dbcols[k - 1] for k in self.columns]
         else:
             dct.pop('columns')
@@ -197,9 +198,13 @@ class CheckConstraint(Constraint):
         if self.inherited:
             return []
 
+        if self.expression[0] != '(':
+            expr = "(%s)" % self.expression
+        else:
+            expr = self.expression
         return ["ALTER %s %s ADD CONSTRAINT %s %s %s" % (
             self._table.objtype, self._table.qualname(), quote_id(self.name),
-            self.objtype, self.expression)]
+            self.objtype, expr)]
 
     def drop(self):
         if self.inherited:

@@ -65,6 +65,11 @@ def split_schema_obj(obj, sch=None):
     :param sch: schema name (defaults to 'pg_catalog')
     :return: tuple
     """
+    def undelim(ident):
+        if ident[0] == '"' and ident[-1] == '"':
+            ident = ident[1:-1]
+        return ident
+
     qualsch = sch
     if sch is None:
         qualsch = 'pg_catalog'
@@ -81,7 +86,7 @@ def split_schema_obj(obj, sch=None):
             (qualsch, obj) = obj.split('.')
     if sch != qualsch:
         sch = qualsch
-    return (sch, obj)
+    return (undelim(sch), undelim(obj))
 
 
 def split_func_args(obj):
@@ -321,7 +326,7 @@ class DbObject(object):
         """
         return quote_id(self.__dict__[self.keylist[0]])
 
-    def to_map(self, db, no_owner=False, no_privs=False):
+    def to_map(self, db, no_owner=False, no_privs=False, deepcopy=True):
         """Convert an object to a YAML-suitable format
 
         :param db: db used to tie the objects together
@@ -333,7 +338,10 @@ class DbObject(object):
         or JSON object.
         """
         import copy
-        dct = copy.deepcopy(self.__dict__)
+        if deepcopy:
+            dct = copy.deepcopy(self.__dict__)
+        else:
+            dct = self.__dict__.copy()
         for key in self.keylist:
             del dct[key]
         if self.description is None:
